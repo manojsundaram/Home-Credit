@@ -4,7 +4,8 @@ import numpy as np
 
 # # Import Pyspark
 from pyspark.sql import SparkSession
-
+from pyspark.sql.functions import first, collect_list, mean, countDistinct
+from pyspark.sql import functions as F
 
 # # Import Machine Learning Module 
 from sklearn.model_selection import train_test_split
@@ -32,17 +33,39 @@ all_bureau = spark.table("poc_pengadaian.bureau")
 all_train = spark.table("poc_pengadaian.application_train")
 all_prev_app = spark.table("poc_pengadaian.previous_application")
 
+type(all_train)
+
 # Preview of Dataset
-all_bureau.head()
-all_train.head()
-all_prev_app.head()
+all_bureau.show(5)
+all_train.show(5)
+all_prev_app.show(5)
 
-# # 3. EDA (EXploratory Data Anaysis)
-all_bureau.describe()
-all_train.describe()
-all_prev_app.describe()
+# # 4. CONVERT FROM RDD TO PANDAS
+df= all_train.toPandas()
 
 
+# # 5. EDA (EXploratory Data Anaysis)
+# Descriptive of Statisics 
+
+all_train.describe().show(2)
 
 
 
+# # 6. DATA AGGREGATION OF SAMPLE_BUREAU
+
+# **Count the number of previous loans and Credit Active** 
+previous_loan_counts = all_bureau.groupBy("SK_ID_BUREAU").count()
+previous_loan_counts.show(10)
+credit_active_counts = all_bureau.groupBy('CREDIT_ACTIVE').count()
+credit_active_counts.show(10)
+
+# **Numeric Aggregating**
+
+
+
+
+
+# # 5. DATA MERGING 
+
+
+# # 4. CHECKING MISSING DATA

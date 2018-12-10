@@ -13,8 +13,12 @@ from sklearn.preprocessing import Imputer
 from sklearn.metrics import classification_report, confusion_matrix
 
 
-# **1.2. import packages for imbalance-learn for balancing class**
+# ** import packages for imbalance-learn for balancing class**
 from imblearn.over_sampling import SMOTE
+
+# ** import utilites packages
+import pickle
+import cdsw
 
 
 # # 2. IMPORT DATASET 
@@ -70,7 +74,7 @@ for col in sample_train_new2.columns :
         dropcol_train.append(col)
         
 
-# Drop feature greater than > 60 % including null value
+# Drop feature greater than > 60 % that contain null value
 sample_train_new3 = sample_train_new2.drop(dropcol_train, axis = 1)
 
 
@@ -115,9 +119,10 @@ X_train_res, y_train_res = sm.fit_sample(X_train, y_train)
 
 # # Register CDSW Parameter Tracking
 # Set Parameter
-#param_numTrees = int(sys.argv[1]) #10
-#param_maxDepth = int(sys.argv[2]) #5
-#param_impurity = sys.argv[3] #'gini'
+
+param_numTrees = int(sys.argv[1]) #10
+param_maxDepth = int(sys.argv[2]) #5
+param_impurity = sys.argv[3] #'gini'
 
 #cdsw.track_metric("numTrees",param_numTrees)
 #cdsw.track_metric("maxDepth",param_maxDepth)
@@ -127,18 +132,27 @@ X_train_res, y_train_res = sm.fit_sample(X_train, y_train)
 # # 10. DEVELOP MODEL
 
 # Develop Machine learning model Using RandomForest Classifier 
-rf = RandomForestClassifier() # default parameter
+rf = RandomForestClassifier(n_jobs=10,
+                             n_estimators=param_numTrees, 
+                             max_depth=param_maxDepth, 
+                             criterion = param_impurity,
+                             random_state=0) 
 rf.fit(X_train_res,y_train_res) # training model 
+
 
 # # 11. MODEL EVALUATION
 # Predict Model
 pred_rf_test = rf.predict(X_test)
     
-#cdsw.track_metric("accuracy", accuracy_score(y_test, pred_rf_test))
+cdsw.track_metric("accuracy", accuracy_score(y_test, pred_rf_test))
 print(accuracy_score(y_test, pred_rf_test))
 
 probs = rf.predict_proba(X_test)
 probs = probs[:, 1]
 
-#cdsw.track_metric("auc", roc_auc_score(y_test, probs))
+cdsw.track_metric("auc", roc_auc_score(y_test, probs))
 print(roc_auc_score(y_test, probs))
+
+pickle.dump(rf, open("models/sklearn_rf.pkl","wb"))
+
+cdsw.track_file("models/sklearn_rf.pkl")
