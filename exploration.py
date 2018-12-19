@@ -29,10 +29,15 @@ sample_train = pd.read_csv('sample_data/sample_train.csv')
 sample_bureau = pd.read_csv('sample_data/sample_bureau.csv')
 sample_prev_app = pd.read_csv('sample_data/sample_prev_app.csv')
 
+
+
+
 # **Preview of Dataset**
 sample_train.head()
 sample_bureau.head()
 sample_prev_app.head()
+
+sample_train.columns
 
 # # 3. EDA (EXploratory Data Anaysis)
 

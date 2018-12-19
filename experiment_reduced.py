@@ -1,4 +1,4 @@
-EXT_SOURCE_3# # 1. IMPORT MODULE 
+# # 1. IMPORT MODULE 
 # **1.1. Import pandas** 
 import pandas as pd
 import numpy as np
@@ -102,9 +102,18 @@ for col in numerical_list:
   sample_train_new3[col] = sample_train_new3[col].fillna(sample_train_new3[col].median())
   
 
+sample_train_new3.info()
+
+sample_train_new4 = sample_train_new3[['FLAG_OWN_CAR','FLAG_OWN_REALTY','CNT_CHILDREN','AMT_INCOME_TOTAL','AMT_CREDIT','TARGET']]
+
+sample_train_new4.head()
+sample_train_new4.info()
+
 # # 8. ONE HOT-ENCODING
 # Get dummy features
-df = pd.get_dummies(sample_train_new3, drop_first=True)
+df = pd.get_dummies(sample_train_new4, drop_first=True)
+
+df.head()
 
 # # 9. BALANCING CLASS
 
@@ -120,9 +129,9 @@ X_train_res, y_train_res = sm.fit_sample(X_train, y_train)
 # # Register CDSW Parameter Tracking
 # Set Parameter
 
-param_numTrees = int(sys.argv[1]) #10
-param_maxDepth = int(sys.argv[2]) #5
-param_impurity = sys.argv[3] #'gini'
+param_numTrees = 10 #int(sys.argv[1]) #10
+param_maxDepth = 5 #int(sys.argv[2]) #5
+param_impurity = 'gini' #sys.argv[3] #'gini'
 
 #cdsw.track_metric("numTrees",param_numTrees)
 #cdsw.track_metric("maxDepth",param_maxDepth)
@@ -144,13 +153,13 @@ rf.fit(X_train_res,y_train_res) # training model
 # Predict Model
 pred_rf_test = rf.predict(X_test)
     
-cdsw.track_metric("accuracy", accuracy_score(y_test, pred_rf_test))
+#cdsw.track_metric("accuracy", accuracy_score(y_test, pred_rf_test))
 print(accuracy_score(y_test, pred_rf_test))
 
 probs = rf.predict_proba(X_test)
 probs = probs[:, 1]
 
-cdsw.track_metric("auc", roc_auc_score(y_test, probs))
+#cdsw.track_metric("auc", roc_auc_score(y_test, probs))
 print(roc_auc_score(y_test, probs))
 
 pickle.dump(rf, open("sklearn_rf.pkl","wb"))

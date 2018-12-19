@@ -1,4 +1,4 @@
-EXT_SOURCE_3# # 1. IMPORT MODULE 
+# # 1. IMPORT MODULE 
 # **1.1. Import pandas** 
 import pandas as pd
 import numpy as np
@@ -29,6 +29,19 @@ sample_bureau = pd.read_csv('sample_data/sample_bureau.csv')
 sample_prev_app = pd.read_csv('sample_data/sample_prev_app.csv')
 
 
+#Preview Dataset 
+sample_train.head()
+sample_bureau.head()
+sample_prev_app.head()
+
+
+sample_train['CODE_GENDER'].groupby(sample_train['CODE_GENDER']).count()
+
+#change XNA subset in CODE_GENDER feature 
+sample_train.loc[sample_train['CODE_GENDER'] == 'XNA', 'CODE_GENDER'] = 'M'
+
+sample_train.dtypes
+
 # # 3. DATA AGGREGATION OF SAMPLE_BUREAU
 
 # **Count the number of previous loans**
@@ -57,8 +70,6 @@ sample_train_new1 = sample_train.merge(previous_loan_counts, on = 'SK_ID_CURR', 
 sample_train_new2 = sample_train_new1.merge(prev_agg, on = 'SK_ID_CURR', how = 'left')
 
   
-
-#Null_Value(sample_train_new2)  
   
 # # 6. MANUAL FEATURE SELECTION
 
@@ -75,42 +86,73 @@ for col in sample_train_new2.columns :
         
 
 # Drop feature greater than > 60 % that contain null value
-sample_train_new3 = sample_train_new2.drop(dropcol_train, axis = 1)
+df = sample_train_new2.drop(dropcol_train, axis = 1)
 
 
-# Recheck dataframe that has been choosed
-#Null_Value(sample_train_new3)
 
 # # 7. FILLING MISSING VALUE
 
 # to check for each feature is object or numeric train
 categorical_list = []
 numerical_list = []
-for col in sample_train_new3.columns.tolist():
-    if sample_train_new3[col].dtype=='object':
+for col in df.columns.tolist():
+    if df[col].dtype=='object':
         categorical_list.append(col)
     else:
         numerical_list.append(col)
 
+categorical_list
+numerical_list
+        
 
 # 1. Filling Missing Values in Categorical dataframe
 for col in categorical_list:
-  sample_train_new3[col] = sample_train_new3[col].fillna(sample_train_new3[col].mode().iloc[0])
+  df[col] = df[col].fillna(df[col].mode().iloc[0])
 
 # 2. Filling Missing Values in Numerical dataframe
 for col in numerical_list:
-  sample_train_new3[col] = sample_train_new3[col].fillna(sample_train_new3[col].median())
+  df[col] = df[col].fillna(df[col].median())
+
+df.dtypes
   
 
+df.dtypes
+
+# Choosing some of feature for train model
+df_train = df[['NAME_INCOME_TYPE',
+               'NAME_FAMILY_STATUS',
+               'NAME_EDUCATION_TYPE',
+               'REG_CITY_NOT_WORK_CITY',
+               'FLAG_PHONE',
+               'FLAG_OWN_CAR',
+               'CODE_GENDER',
+               'FLAG_OWN_REALTY',
+               'EXT_SOURCE_3',
+               'EXT_SOURCE_2',
+               'AMT_INCOME_TOTAL',
+               'AMT_CREDIT',
+               'TARGET']]
+
+df_train.head()
+df_train.dtypes
+df_train.iloc[3]
+
+col =['NAME_INCOME_TYPE','NAME_FAMILY_STATUS',]
 # # 8. ONE HOT-ENCODING
 # Get dummy features
-df = pd.get_dummies(sample_train_new3, drop_first=True)
+df_train = pd.get_dummies(df_train, drop_first=True)
+
+df_train.head()
+df_train.dtypes
+df_train.shape
+df_train.columns
+
 
 # # 9. BALANCING CLASS
 
 # Split data to train and test
-X = df.drop(['TARGET'], axis=1)
-y = df['TARGET']
+X = df_train.drop(['TARGET'], axis=1)
+y = df_train['TARGET']
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=0)
 
 # Balancing Class Target with SMOTE Method
@@ -120,14 +162,13 @@ X_train_res, y_train_res = sm.fit_sample(X_train, y_train)
 # # Register CDSW Parameter Tracking
 # Set Parameter
 
-param_numTrees = int(sys.argv[1]) #10
-param_maxDepth = int(sys.argv[2]) #5
-param_impurity = sys.argv[3] #'gini'
+param_numTrees = 10 #int(sys.argv[1]) #10
+param_maxDepth = 5 #int(sys.argv[2]) #5
+param_impurity = 'gini' #sys.argv[3] #'gini'
 
 #cdsw.track_metric("numTrees",param_numTrees)
 #cdsw.track_metric("maxDepth",param_maxDepth)
 #cdsw.track_metric("impurity",param_impurity)
-
 
 # # 10. DEVELOP MODEL
 
@@ -144,15 +185,15 @@ rf.fit(X_train_res,y_train_res) # training model
 # Predict Model
 pred_rf_test = rf.predict(X_test)
     
-cdsw.track_metric("accuracy", accuracy_score(y_test, pred_rf_test))
+#cdsw.track_metric("accuracy", accuracy_score(y_test, pred_rf_test))
 print(accuracy_score(y_test, pred_rf_test))
 
 probs = rf.predict_proba(X_test)
 probs = probs[:, 1]
 
-cdsw.track_metric("auc", roc_auc_score(y_test, probs))
+#cdsw.track_metric("auc", roc_auc_score(y_test, probs))
 print(roc_auc_score(y_test, probs))
 
-pickle.dump(rf, open("sklearn_rf.pkl","wb"))
+pickle.dump(rf, open("sklearn_rf_large.pkl","wb"))
 
-cdsw.track_file("sklearn_rf.pkl")
+cdsw.track_file("sklearn_rf_large.pkl")
