@@ -1,216 +1,474 @@
-# # 1. IMPORT MODULE test masukin comment
-# **1.1. Import pandas** 
-import pandas as pd
-import numpy as np
+# # Import Pandas DF operation
+
+import pandas as pd # Import modul pandas  
+import numpy as np  # Import modul numpy 
+# ______________________________________________________________________
 
 
-# **Import Machine Learning Module** 
-from sklearn.model_selection import train_test_split, RandomizedSearchCV
+
+
+# # Import Pyspark Module  
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import first, collect_list, mean, countDistinct
+from pyspark.sql import functions as f
+from pyspark.ml.feature import OneHotEncoderEstimator
+from pyspark.sql.functions import isnull, when, count, col
+from pyspark.sql.types import IntegerType, StringType, DoubleType, ShortType
+
+# => Import modul pyspark yang dibutuhkan 
+# ______________________________________________________________________
+
+
+
+
+# # Import Machine Learning Module 
+from sklearn.model_selection import train_test_split,RandomizedSearchCV
 from sklearn.metrics import roc_curve, roc_auc_score, auc
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score
 from sklearn.preprocessing import Imputer
-from sklearn.metrics import classification_report, confusion_matrix
+
+# => Import modul machine learning yaitu Scikit-Learn(Sklearn)
+# ______________________________________________________________________
 
 
-# **1.2. import packages for imbalance-learn for balancing class**
+
+
+# # Balancing Class 
 from imblearn.over_sampling import SMOTE
 
+# => Import modul balancing class/target menggunakan metode metode SMOTE 
+# ______________________________________________________________________
 
-# **1.3. visualization**
+
+
+
+# visualization
 import matplotlib.pyplot as plt 
-import seaborn as sns
-%matplotlib inline
+import seaborn as sns 
 
-# # 2. IMPORT DATASET 
-
-# **Import dataset**
-sample_train = pd.read_csv('sample_data/sample_train.csv')
-sample_bureau = pd.read_csv('sample_data/sample_bureau.csv')
-sample_prev_app = pd.read_csv('sample_data/sample_prev_app.csv')
+# => Import modul untuk melakukan Visualization menggunakan matplotlib dan seaborn  
+# ________________________________________________________________________________
 
 
 
 
-# **Preview of Dataset**
-sample_train.head()
-sample_bureau.head()
-sample_prev_app.head()
+# Create Spark Session
+spark = SparkSession.builder.appName("Risk Model").getOrCreate()
 
-sample_train.columns
+# => Create Sparksession masuk ke pemrograman Spark dengan API Dataset dan DataFrame.
+# ________________________________________________________________________________
 
-# # 3. EDA (EXploratory Data Anaysis)
 
-# **Descriptive of sample_train**
-sample_train.describe()
 
-# **Distribution of AMT_CREDIT**
-plt.figure(figsize=(8,5))
-sns.distplot(sample_train["AMT_CREDIT"]).set_title('Distribution of AMT_CREDIT')
 
-# **Distibution of AMT_INCOME_TOTAL**
-plt.figure(figsize=(8,5))
-sns.distplot(sample_train["AMT_INCOME_TOTAL"]).set_title('Distribution of AMT_INCOME_TOTAL')
+# Import dataset
+all_bureau = spark.table("poc_pengadaian.bureau")
+all_train = spark.table("poc_pengadaian.application_train")
+all_prev_app = spark.table("poc_pengadaian.previous_application2")
 
-# **Distribusi of AMT_GOODS_PRICE**
-plt.figure(figsize=(8,5))
-sns.distplot(sample_train["AMT_GOODS_PRICE"].dropna()).set_title('Distribution of AMT_GOODS_PRICE')
+# => import data menggunakan perintah spark tabel 
+# ________________________________________________________________________________
 
-# **Data is balanced or imbalanced**
-temp = sample_train["TARGET"].value_counts()
-df = pd.DataFrame({'labels': temp.index,
-                   'values': temp.values})
-plt.figure(figsize = (6,6))
-sns.set_color_codes("pastel")
-sns.barplot(x = 'labels', y="values", data=df).set_title('Application loans repayed - train dataset')
 
-# **Family Status of Applicant's who applied for loan**
-temp = sample_train["NAME_FAMILY_STATUS"].value_counts()
-df = pd.DataFrame({'labels': temp.index,
-                   'values': temp.values})
-plt.figure(figsize = (6,6))
-sns.barplot(x = 'labels', y="values", data=df).set_title('Family Status')
 
-# **Income sources of Applicant's who applied for loan**
-temp = sample_train["NAME_INCOME_TYPE"].value_counts()
-df = pd.DataFrame({'labels': temp.index,
-                   'values': temp.values})
-sns.barplot(x = 'labels', y="values", data=df).set_title('Income sources of Applicant')
 
-# # 4. CHECKING MISSING DATA
+# Preview of Dataset
+all_bureau.show(2)
+all_train.show(2)
+all_prev_app.show(2)
 
-# **make NUll function for checking each Dataset**
+# => code diatas digunakan untuk melihat display spark dataframe
+# ________________________________________________________________________________
+
+
+
+
+# Schema of Dataframe
+all_bureau.printSchema()
+all_train.printSchema()
+all_prev_app.printSchema()
+
+# => code diatas digunakan untuk melihat type data frame 
+# ________________________________________________________________________________
+
+
+
+
+
+# Count row and column number 
+print((all_bureau.count(), len(all_bureau.columns)))
+print((all_train.count(), len(all_train.columns)))
+print((all_prev_app.count(), len(all_prev_app.columns)))
+
+# => code diatas digunakan untuk melihat jumlah row dan column dari dataframe 
+# ________________________________________________________________________________
+
+
+
+
+
+# Select column from Dataframe
+df_bureau = all_bureau.select('sk_id_curr','credit_active','sk_id_bureau','amt_credit_sum')
+df_train = all_train.select('sk_id_curr','target','ext_source_3','amt_credit','amt_income_total','ext_source_2','name_education_type','code_gender','flag_own_car','reg_city_not_work_city','flag_phone','name_family_status','name_income_type','commonarea_medi','commonarea_avg','occupation_type')
+df_prev_app = all_prev_app.select('sk_id_curr','amt_credit','amt_application')
+
+
+# => code diatas digunakan untuk memilih colum yang dibutuhkan dalam develop model
+# ________________________________________________________________________________
+
+
+
+
+
+# Change dtypes column all_bureau
+df_bureau = df_bureau.withColumn("sk_id_curr", df_bureau["sk_id_curr"].cast(IntegerType()))
+df_bureau = df_bureau.withColumn("sk_id_curr", df_bureau["credit_active"].cast(StringType()))
+df_bureau = df_bureau.withColumn("sk_id_curr", df_bureau["sk_id_bureau"].cast(IntegerType()))
+df_bureau = df_bureau.withColumn("amt_credit_sum", df_bureau["amt_credit_sum"].cast(DoubleType()))
+
+# Change dtypes column all_train
+df_train = df_train.withColumn("sk_id_curr",df_train["sk_id_curr"].cast(IntegerType()))
+df_train = df_train.withColumn("target",df_train["target"].cast(IntegerType()))
+df_train = df_train.withColumn("ext_source_3", df_train["ext_source_3"].cast(DoubleType()))
+df_train = df_train.withColumn("ext_source_2", df_train["ext_source_2"].cast(DoubleType()))
+df_train = df_train.withColumn("name_education_type", df_train["name_education_type"].cast(StringType()))
+df_train = df_train.withColumn("code_gender", df_train["code_gender"].cast(StringType()))
+df_train = df_train.withColumn("amt_credit", df_train["amt_credit"].cast(DoubleType()))
+df_train = df_train.withColumn("amt_income_total", df_train["amt_income_total"].cast(DoubleType()))
+df_train = df_train.withColumn("flag_own_car", df_train["flag_own_car"].cast(StringType()))
+df_train = df_train.withColumn("reg_city_not_work_city", df_train["reg_city_not_work_city"].cast(IntegerType()))
+df_train = df_train.withColumn("flag_phone",df_train["flag_phone"].cast(IntegerType()))
+df_train = df_train.withColumn("name_income_type",df_train["name_income_type"].cast(StringType()))
+df_train = df_train.withColumn("name_family_status",df_train["name_family_status"].cast(StringType()))
+df_train = df_train.withColumn("commonarea_medi",df_train["commonarea_medi"].cast(DoubleType()))
+df_train = df_train.withColumn("commonarea_avg",df_train["commonarea_avg"].cast(DoubleType()))
+df_train = df_train.withColumn("occupation_type",df_train["occupation_type"].cast(StringType()))
+
+# Change dtypes column all_prev_app
+df_prev_app = df_prev_app.withColumn("sk_id_curr", df_prev_app["sk_id_curr"].cast(IntegerType()))
+df_prev_app = df_prev_app.withColumn("amt_credit", df_prev_app["amt_credit"].cast(DoubleType()))
+df_prev_app = df_prev_app.withColumn("amt_application", df_prev_app["amt_application"].cast(DoubleType()))
+
+# => code diatas digunakan untuk mengubah type data secara manual 
+# => jika tidak ingin secara manual, dapat digunakan perintah inferschema pada saat import data 
+# _____________________________________________________________________________________________
+
+
+
+
+
+# Schema of Dataframe
+df_bureau.printSchema()
+df_train.printSchema()
+df_prev_app.printSchema()
+
+# => Gunakan perintah diatas kenbali, apakah tipe data diatas sudah berubah atau belum. 
+# _____________________________________________________________________________________________
+
+
+
+
+
+# # DATA AGGREGATION 
+
+# categorical aggregation
+previous_loan_counts = df_bureau.groupBy("sk_id_curr").agg(f.count("sk_id_bureau")).orderBy("sk_id_curr")
+previous_loan_counts.show(10)
+credit_active_counts = df_bureau.groupBy('sk_id_curr').agg(f.count("credit_active")).orderBy("sk_id_curr")
+credit_active_counts.show(10)
+name_family_status = df_train.groupBy('sk_id_curr').agg(f.count("name_family_status")).orderBy("sk_id_curr")
+name_family_status.show(10)
+
+# => code diatas digunakan untuk melakukan agregasi berdasarkan feature tertentu 
+# _____________________________________________________________________________________________
+
+
+
+
+
+# **Numeric Aggregating**
+prev_agg = df_prev_app.groupBy("sk_id_curr").agg({'amt_credit': 'avg','amt_application' : 'avg'})
+prev_agg.show(10)
+bureau_agg = df_bureau.groupBy("sk_id_curr").agg({'amt_credit_sum': 'max'})
+bureau_agg.show(10)
+
+# => Dalam hal ini kita dapat melakukan agregasi dengan melihat mean dari setiap feature berdasarkan feature tertentu
+# ___________________________________________________________________________________________________________________
+
+
+
+
+
+# Merging data
+train = df_train.join(prev_agg, df_train.sk_id_curr == prev_agg.sk_id_curr).drop(prev_agg.sk_id_curr)
+train.printSchema()
+train.show()
+
+# => Code diatas digunakan untuk menggabungkan column dari tabel lain ke dalam tabel yang diinginkan
+# __________________________________________________________________________________________________
+
+
+
+
+
+# # DATA PROFILLING 
+# Show dimension statistics
+train.describe().show()
+
+# => Statistika Descriptive untuk setiap feature
+# __________________________________________________________________________________________________
+
+
+train.groupBy("target").count().show()
+train.groupBy("code_gender").count().show()
+train.groupBy("name_family_status").count().show()
+train.groupBy("name_education_type").count().show() 
+train.groupBy("name_income_type").count().show() 
+
+# => Code diatas digunakan untuk menghitung jumlah subset yang ada di eature tersebut
+# __________________________________________________________________________________________________
+
+
+
+
+
+# checking missing value
+def na_value(df):
+  columns = df.columns
+  for col in columns :
+    number_of_NA = df.filter(df[col].isNull()).count()
+    number_of_rows = df.count()
+    count_null = number_of_NA/number_of_rows
+    print ('% of Null Value', col, ':', round(count_null*100,2),'%')
+
+    na_value(train)
+
+# => Menghitung jumlah null value dari setiap feature  
+# __________________________________________________________________________________________________
+
+
+
+
+
+# Choose feature with null => 60 %
+treshold = 0.6 
+columns = train.columns
+dropcol = []
+
+def proportion_null(df):
+  for col in columns :
+    if (df.filter(df[col].isNull()).count()/df.count() >= treshold):
+      dropcol.append(col)
+
+proportion_null(train)
+print('Feature dataframe will be removed = ', '\n', dropcol)
+
+# => Code diatas merupakan fungsi otomatis untuk memilih feature yang memiliki null value => 60 %
+# __________________________________________________________________________________________________
+
+
+
+
+# Drop Column null => 60% 
+train_new = train.drop('commonarea_medi', 'commonarea_avg')
+train_new.show(2)
+train_new.printSchema()
+
+# => Drop feature yang memiliki null value => 60 % karena informasi dalam feature tersebut terlalu berpengaruh 
+# _____________________________________________________________________________________________________________
+
+
+
+
+
+# # SAMPLING DATA and CONVERT TO PANDAS
+
+df_train = train_new.sample(False,0.1).toPandas()
+print ('Number of rows and column df_train = ',df_train.shape)
+df_train.head()
+df_train.dtypes
+
+# => Code diatas digunakan untuk melakukan sampling data dan mengubah spark dataframe ke dalam pandas dataframe
+# _____________________________________________________________________________________________________________
+
+
+
+
+# checking Null Value in pandas
 def Null_Value(df):
   total = df.isnull().sum().sort_values(ascending = False)
   percent = (df.isnull().sum()/df.isnull().count()*100).sort_values(ascending = False)
   missing  = pd.concat([total, percent], axis=1, keys=['Total', 'Percent'])
-  return missing.head(10)
+  return missing.head(15)
 
-# **checking Missing Value**
-Null_Value(sample_train)
-Null_Value(sample_bureau)
-Null_Value(sample_prev_app)
+Null_Value(df_train)
 
-# # 5. DATA AGGREGATION OF SAMPLE_BUREAU
-
-# **Count the number of previous loans**
-previous_loan_counts = sample_bureau.groupby('SK_ID_CURR', as_index=False)['SK_ID_BUREAU'].count().rename(columns = {'SK_ID_BUREAU': 'previous_loan_counts'})
-previous_loan_counts.head()
-
-# **Count Credit Active**
-credit_active_counts = sample_bureau.groupby('SK_ID_CURR', as_index=False)['CREDIT_ACTIVE'].count().rename(columns = {'CREDIT_ACTIVE':'credit_active_counts'})
-credit_active_counts.head()
+# => Code diatas merupakan sbuah fungsi untuk melihat berapa jumlah null value pada setiap feature (Code Python)
+# ______________________________________________________________________________________________________________
 
 
-# # 6. DATA AGGREGATION OF SAMPLE_PREVIOUS_APPLICATION
-
-# **Numeric Aggregating**
-prev_agg = sample_prev_app.drop(['SK_ID_PREV'], axis = 1).groupby('SK_ID_CURR', as_index = False)['AMT_CREDIT','AMT_APPLICATION'].agg(['mean', 'max', 'min', 'sum']).reset_index()
-prev_agg.columns = [''.join(col) for col in prev_agg.columns]
-prev_agg.head()
 
 
-# # 7. DATA MERGING 
 
-# **Merge previous_loan_counts with sample_train**
-sample_train_new1 = sample_train.merge(previous_loan_counts, on = 'SK_ID_CURR', how = 'left')
-sample_train_new1.head()
+# # FILLING MISSING VALUE
+columns_null = ['ext_source_3','ext_source_2']
+for col in columns_null:
+  df_train[col] = df_train[col].fillna(df_train[col].median())
 
-# **Merge prev_aggregating with sample_train**
-sample_train_new2 = sample_train_new1.merge(prev_agg, on = 'SK_ID_CURR', how = 'left')
-sample_train_new2.head()
+Null_Value(df_train)
+
+# => Code diatas digunakan untuk mengisi null_value dengan suatu nilai yang mendekatinya (mean,median,modus) 
+# __________________________________________________________________________________________________________
+
+
+
+
   
+# # EDA (EXploratory Data Anaysis)
 
-Null_Value(sample_train_new2)  
-  
-# # 8. MANUAL FEATURE SELECTION
+# **Distribution of AMT_CREDIT**
+plt.figure(figsize=(8,5))
+sns.distplot(df_train["amt_credit"]).set_title('Distribution of AMT_CREDIT')
 
-# **Make function to choose suitable feature **
-# define feature location that wanna removed
-thr_train = 0.6
-size_train=sample_train_new2.shape[0]
-dropcol_train = []
 
-#looping to take the number of null of every feature 
-for col in sample_train_new2.columns :
-    if (sample_train_new2[col].isnull().sum()/size_train >= thr_train):
-        dropcol_train.append(col)
-        
-print('Feature dataframe will be removed = ', '\n', dropcol_train)
+# **Distibution of AMT_INCOME_TOTAL**
+plt.figure(figsize=(8,5))
+sns.distplot(df_train["amt_income_total"]).set_title('Distribution of AMT_INCOME_TOTAL')
 
-# Drop feature greater than > 60 % including null value
-sample_train_new3 = sample_train_new2.drop(dropcol_train, axis = 1)
-sample_train_new3.head()
+# **Data is balanced or imbalanced**
+temp = df_train["target"].value_counts()
+df = pd.DataFrame({'labels': temp.index,
+                   'values': temp.values})
+plt.figure(figsize = (8,6))
+sns.set_color_codes("pastel")
+sns.barplot(x = 'labels', y="values", data=df).set_title('Application loans repayed - train dataset')
 
-# Recheck dataframe that has been choosed
-Null_Value(sample_train_new3)
+# **Family Status of Applicant's who applied for loan**
+temp = df_train["name_family_status"].value_counts()
+df = pd.DataFrame({'labels': temp.index,
+                   'values': temp.values})
+plt.figure(figsize = (8,6))
+sns.barplot(x = 'labels', y="values", data=df).set_title('Family Status')
 
-# # 9. FILLING MISSING VALUE
+# **Income sources of Applicant's who applied for loan**
+temp = df_train["name_income_type"].value_counts()
+df = pd.DataFrame({'labels': temp.index,
+                   'values': temp.values})
+sns.barplot(x = 'labels', y="values", data=df).set_title('Income sources of Applicant')
 
-# to check for each feature is object or numeric train
-categorical_list = []
-numerical_list = []
-for col in sample_train_new3.columns.tolist():
-    if sample_train_new3[col].dtype=='object':
-        categorical_list.append(col)
-    else:
-        numerical_list.append(col)
-print('Number of categorical features:', str(len(categorical_list)))
-print('Number of numerical features:', str(len(numerical_list)))
 
-# Recheck again
-Null_Value(sample_train_new3)
+# **Income sources of Applicant's who applied for loan**
+temp = df_train["name_income_type"].value_counts()
+df = pd.DataFrame({'labels': temp.index,
+                   'values': temp.values})
+sns.barplot(x = 'labels', y="values", data=df).set_title('Income sources of Applicant')
 
-# 1. Filling Missing Values in Categorical dataframe
-for col in categorical_list:
-  sample_train_new3[col] = sample_train_new3[col].fillna(sample_train_new3[col].mode().iloc[0])
+# => Code diatas digunakan untuk melakukan visualisasi (distribusi plot dan barplot)
+# __________________________________________________________________________________________________
 
-# 2. Filling Missing Values in Numerical dataframe
-for col in numerical_list:
-  sample_train_new3[col] = sample_train_new3[col].fillna(sample_train_new3[col].median())
-  
 
-# # 10. ONE HOT-ENCODING
+
+
+
+# # ONE HOT-ENCODING
 # Get dummy features
-df = pd.get_dummies(sample_train_new3, drop_first=True)
+df_train = pd.get_dummies(df_train, drop_first=True)
+df_train.shape
+df_train.columns
 
-# # 11. BALANCING CLASS
+# => Code diatas digunakan untuk membuat kode untuk setiap subset yang tipe datanya kategorik  
+# __________________________________________________________________________________________________
+
+
+
 
 # Split data to train and test
-X = df.drop(['TARGET'], axis=1)
-y = df['TARGET']
+X = df_train.drop(['target'], axis=1)
+y = df_train['target']
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=0)
+
+# => Lakukan split data kedalam data train dan test dengan perbandngan (80:20)
+# => pembagian tersebut dengan memisahkan antara semua feature dengan targetnya
+# __________________________________________________________________________________________________
+
+
+
 
 # Balancing Class Target with SMOTE Method
 sm = SMOTE(random_state=0)
 X_train_res, y_train_res = sm.fit_sample(X_train, y_train)
 
-# # 11. DEVELOP MODEL
+# => Karena target nya tidak balance maka dilakukan balancing terlebih dahulu untuk data train
+# __________________________________________________________________________________________________
+
+
+
+
+# # Register CDSW Parameter Tracking
+# Set Parameter
+
+param_numTrees = 10 #int(sys.argv[1]) #10
+param_maxDepth = 5 #int(sys.argv[2]) #5
+param_impurity = 'gini' #sys.argv[3] #'gini'
+
+#cdsw.track_metric("numTrees",param_numTrees)
+#cdsw.track_metric("maxDepth",param_maxDepth)
+#cdsw.track_metric("impurity",param_impurity)
+
+
+# => Penentuan parameter dalam algoritma Randomforest
+# __________________________________________________________________________________________________
+
+
+
+
+
+# # 10. DEVELOP MODEL
 
 # Develop Machine learning model Using RandomForest Classifier 
-rf = RandomForestClassifier() # default parameter
+rf = RandomForestClassifier(n_jobs=10,
+                             n_estimators=param_numTrees, 
+                             max_depth=param_maxDepth, 
+                             criterion = param_impurity,
+                             random_state=0) 
 rf.fit(X_train_res,y_train_res) # training model 
 
-# # 13. MODEL EVALUATION
+# => Model yang digunakan adalah algoritma Randomforest
+# __________________________________________________________________________________________________
+
+
+
+
+
+# # 11. MODEL EVALUATION
 # Predict Model
-pred_rf_train = rf.predict(X_train_res)
 pred_rf_test = rf.predict(X_test)
 
+# => melaukan prediksi dengan data test 
+# __________________________________________________________________________________________________
+    
 
-#Make Function Model Evaluation
-def eval(target, predict):
-    print('Confusion Matrix : ')
-    print(confusion_matrix(target, predict),'\n')
-    print('Classification Report : ')
-    print(classification_report(target, predict))
-    print('Accuracy Model : ',accuracy_score(target, predict)*100,'%')
+#cdsw.track_metric("accuracy", accuracy_score(y_test, pred_rf_test))
+# cek akurasi yang didaparkan
+print(accuracy_score(y_test, pred_rf_test))
+
+# => Evaluasi model yang dibuat dengan melihat tingkat akurasi yang dihasilkan 
+# __________________________________________________________________________________________________
 
 
-# Train Evaluation
-eval(y_train_res,pred_rf_train)
 
-# Test Evaluation
-eval(y_test,pred_rf_test)
+
+probs = rf.predict_proba(X_test)
+probs = probs[:, 1]
+
+#cdsw.track_metric("auc", roc_auc_score(y_test, probs))
+print(roc_auc_score(y_test, probs))
+
+# => Evaluasi model yang dibuat dengan melihat nilai Area Under Curve (AUC) 
+# __________________________________________________________________________________________________
+
+
     
 # ROC curve
 # Make Function ROC CURVE 
@@ -232,39 +490,6 @@ def ROC_CURVE(feature, target, model):
 
 ROC_CURVE(X_test, y_test, rf)
 
-# # 14. TUNING HYPERPARAMETER USING RANDOMIZE SEARCH
+# => Code diatas untuk menampilkan grafik ROC-AUC, seberapa akurat model dalam proses klasifikasi  
+# __________________________________________________________________________________________________
 
-# Setting Parameter 
-n_estimators = [100, 500, 1000]
-max_features = [10, 20, 50]
-max_depth = [5, 10,20]
-min_samples_split = [2, 5, 10]
-min_samples_leaf = [10, 20, 30]
-bootstrap = [True, False]
-
-# Create the random grid
-param = {'n_estimators': n_estimators,
-          'max_features': max_features,
-          'max_depth': max_depth,
-          'min_samples_split': min_samples_split,
-          'min_samples_leaf': min_samples_leaf,
-          'bootstrap': bootstrap}
-
-# Training model
-clf = RandomizedSearchCV(rf, param, n_iter=3, cv= 5)
-
-# fit randomize search 
-best_model = clf.fit(X_train_res,y_train_res)
-
-#predict best model
-pred_best_train = best_model.predict(X_train_res) 
-pred_best_test = best_model.predict(X_test)
-
-# Train Evaluation
-eval(y_train_res,pred_best_train)
-
-# Test Evaluation
-eval(y_test,pred_best_test)
-
-# ROC Curve
-ROC_CURVE(X_test, y_test, clf)

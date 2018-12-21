@@ -11,7 +11,7 @@ Modify the default files to get started with your own project.
 * `exploration.py` -- An example Python analysis script.
 * `cdsw-build.sh` -- A custom build script used for models and experiments. This
 will pip install our dependencies, primarily the scikit-learn library.
-* `fit.py` -- A model training example to be run as an experiment. Generates the
+* `experiment.py` -- A model training example to be run as an experiment. Generates the
 model.pkl file that contains the fitted parameters of our model.
 * `predict.py` --  A sample function to be deployed as a model. Uses `model.pkl`
 produced by `fit.py` to make predictions about petal width.
@@ -23,7 +23,7 @@ produced by `fit.py` to make predictions about petal width.
 
 ## Instructions for Experiments and Models
 1. Click "Open Workbench".
-2. Run an experiment with `fit.py` as the input script.
+2. Run an experiment with `experiment.py` as the input script.
 3. Once the experiment is complete, save the `model.pkl` file to the project.
 4. Deploy a model using `predict.py`. Specify `predict` as the input function.
 
